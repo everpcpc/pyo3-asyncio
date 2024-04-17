@@ -65,7 +65,7 @@ use pyo3::prelude::*;
 #[pyo3_asyncio::async_std::main]
 async fn main() -> PyResult<()> {
     let fut = Python::with_gil(|py| {
-        let asyncio = py.import("asyncio")?;
+        let asyncio = py.import_bound("asyncio")?;
         // convert asyncio.sleep into a Rust Future
         pyo3_asyncio::async_std::into_future(asyncio.call_method1("sleep", (1.into_py(py),))?)
     })?;
@@ -95,7 +95,7 @@ use pyo3::prelude::*;
 #[pyo3_asyncio::tokio::main]
 async fn main() -> PyResult<()> {
     let fut = Python::with_gil(|py| {
-        let asyncio = py.import("asyncio")?;
+        let asyncio = py.import_bound("asyncio")?;
         // convert asyncio.sleep into a Rust Future
         pyo3_asyncio::tokio::into_future(asyncio.call_method1("sleep", (1.into_py(py),))?)
     })?;
@@ -149,7 +149,7 @@ Export an async function that makes use of `async-std`:
 use pyo3::{prelude::*, wrap_pyfunction};
 
 #[pyfunction]
-fn rust_sleep(py: Python) -> PyResult<&PyAny> {
+fn rust_sleep(py: Python) -> PyResult<Bound<PyAny>> {
     pyo3_asyncio::async_std::future_into_py(py, async {
         async_std::task::sleep(std::time::Duration::from_secs(1)).await;
         Ok(())
@@ -173,7 +173,7 @@ If you want to use `tokio` instead, here's what your module should look like:
 use pyo3::{prelude::*, wrap_pyfunction};
 
 #[pyfunction]
-fn rust_sleep(py: Python) -> PyResult<&PyAny> {
+fn rust_sleep(py: Python) -> PyResult<Bound<PyAny>> {
     pyo3_asyncio::tokio::future_into_py(py, async {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         Ok(())
@@ -237,7 +237,7 @@ use pyo3::prelude::*;
 async fn main() -> PyResult<()> {
     let future = Python::with_gil(|py| -> PyResult<_> {
         // import the module containing the py_sleep function
-        let example = py.import("example")?;
+        let example = py.import_bound("example")?;
 
         // calling the py_sleep method like a normal function
         // returns a coroutine
@@ -289,7 +289,7 @@ async fn rust_sleep() {
 }
 
 #[pyfunction]
-fn call_rust_sleep(py: Python) -> PyResult<&PyAny> {
+fn call_rust_sleep(py: Python) -> PyResult<Bound<PyAny>> {
     pyo3_asyncio::async_std::future_into_py(py, async move {
         rust_sleep().await;
         Ok(())
@@ -356,7 +356,7 @@ async fn main() -> PyResult<()> {
     // PyO3 is initialized - Ready to go
 
     let fut = Python::with_gil(|py| -> PyResult<_> {
-        let asyncio = py.import("asyncio")?;
+        let asyncio = py.import_bound("asyncio")?;
 
         // convert asyncio.sleep into a Rust Future
         pyo3_asyncio::async_std::into_future(
@@ -396,7 +396,7 @@ RuntimeError: no running event loop
 ```
 
 What's happening here is that we are calling `rust_sleep` _before_ the future is
-actually running on the event loop created by `asyncio.run`. This is counter-intuitive, but expected behaviour, and unfortunately there doesn't seem to be a good way of solving this problem within PyO3 Asyncio itself.
+actually running on the event loop created by `asyncio.run`. This is counter-intuitive, but expected behavior, and unfortunately there doesn't seem to be a good way of solving this problem within PyO3 Asyncio itself.
 
 However, we can make this example work with a simple workaround:
 
@@ -443,7 +443,7 @@ tokio = "1.9"
 use pyo3::{prelude::*, wrap_pyfunction};
 
 #[pyfunction]
-fn rust_sleep(py: Python) -> PyResult<&PyAny> {
+fn rust_sleep(py: Python) -> PyResult<Bound<PyAny>> {
     pyo3_asyncio::tokio::future_into_py(py, async {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         Ok(())
@@ -504,7 +504,7 @@ fn main() -> PyResult<()> {
     pyo3::prepare_freethreaded_python();
 
     Python::with_gil(|py| {
-        let uvloop = py.import("uvloop")?;
+        let uvloop = py.import_bound("uvloop")?;
         uvloop.call_method0("install")?;
 
         // store a reference for the assertion
@@ -514,7 +514,7 @@ fn main() -> PyResult<()> {
             // verify that we are on a uvloop.Loop
             Python::with_gil(|py| -> PyResult<()> {
                 assert!(uvloop
-                    .as_ref(py)
+                    .bind(py)
                     .getattr("Loop")?
                     .downcast::<PyType>()
                     .unwrap()
@@ -541,7 +541,7 @@ fn main() -> PyResult<()> {
 
 So what's changed from `v0.13` to `v0.14`?
 
-Well, a lot actually. There were some pretty major flaws in the initialization behaviour of `v0.13`. While it would have been nicer to address these issues without changing the public API, I decided it'd be better to break some of the old API rather than completely change the underlying behaviour of the existing functions. I realize this is going to be a bit of a headache, so hopefully this section will help you through it.
+Well, a lot actually. There were some pretty major flaws in the initialization behavior of `v0.13`. While it would have been nicer to address these issues without changing the public API, I decided it'd be better to break some of the old API rather than completely change the underlying behavior of the existing functions. I realize this is going to be a bit of a headache, so hopefully this section will help you through it.
 
 To make things a bit easier, I decided to keep most of the old API alongside the new one (with some deprecation warnings to encourage users to move away from it). It should be possible to use the `v0.13` API alongside the newer `v0.14` API, which should allow you to upgrade your application piecemeal rather than all at once.
 
@@ -569,7 +569,7 @@ To make things a bit easier, I decided to keep most of the old API alongside the
 ### Upgrading Your Code to 0.14
 
 1. Fix PyO3 0.14 initialization.
-   - PyO3 0.14 feature gated its automatic initialization behaviour behind "auto-initialize". You can either enable the "auto-initialize" behaviour in your project or add a call to `pyo3::prepare_freethreaded_python()` to the start of your program.
+   - PyO3 0.14 feature gated its automatic initialization behavior behind "auto-initialize". You can either enable the "auto-initialize" behavior in your project or add a call to `pyo3::prepare_freethreaded_python()` to the start of your program.
    - If you're using the `#[pyo3_asyncio::<runtime>::main]` proc macro attributes, then you can skip this step. `#[pyo3_asyncio::<runtime>::main]` will call `pyo3::prepare_freethreaded_python()` at the start regardless of your project's "auto-initialize" feature.
 2. Fix the tokio initialization.
 
@@ -601,7 +601,7 @@ To make things a bit easier, I decided to keep most of the old API alongside the
        pyo3::prepare_freethreaded_python();
 
        Python::with_gil(|py| {
-           let asyncio = py.import("asyncio")?;
+           let asyncio = py.import_bound("asyncio")?;
 
            let event_loop = asyncio.call_method0("new_event_loop")?;
            asyncio.call_method1("set_event_loop", (event_loop,))?;
@@ -614,11 +614,11 @@ To make things a bit easier, I decided to keep most of the old API alongside the
                // Stop the event loop manually
                Python::with_gil(|py| {
                    event_loop_hdl
-                       .as_ref(py)
+                       .bind(py)
                        .call_method1(
                            "call_soon_threadsafe",
                            (event_loop_hdl
-                               .as_ref(py)
+                               .bind(py)
                                .getattr("stop")
                                .unwrap(),),
                        )
@@ -646,7 +646,7 @@ To make things a bit easier, I decided to keep most of the old API alongside the
 There have been a few changes to the API in order to support proper cancellation from Python and the `contextvars` module.
 
 - Any instance of `cancellable_future_into_py` and `local_cancellable_future_into_py` conversions can be replaced with their`future_into_py` and `local_future_into_py` counterparts.
-  > Cancellation support became the default behaviour in 0.15.
+  > Cancellation support became the default behavior in 0.15.
 - Instances of `*_with_loop` conversions should be replaced with the newer `*_with_locals` conversions.
 
   ```rust no_run
